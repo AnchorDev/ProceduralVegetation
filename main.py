@@ -1,14 +1,14 @@
 import glfw
 from OpenGL.GL import *
 from utils.shader_loader import load_shader
-from objects.tree import create_cone_tree, create_sphere_tree
+from objects.tree import create_cone_tree, create_sphere_tree, create_palm_tree
 from objects.ground import create_ground
 from utils.camera import Camera
 from pyrr import Matrix44
 import random
 import time
 
-# --- Myszka: globalne zmienne ---
+#Myszka
 last_x, last_y = 400, 300
 first_mouse = True
 
@@ -55,15 +55,18 @@ def main():
     # Tworzymy ziemię
     ground_vao, ground_count = create_ground()
 
-    # Generujemy 20 drzew losowo stożkowych lub „kulistych”
+    # Generujemy drzewa losowo
     trees = []
-    for _ in range(30):
-        if random.random() < 0.5:
+    for _ in range(500):
+        r = random.random()
+        if r < 0.33:
             vao, count, height = create_cone_tree()
-        else:
+        elif r < 0.66:
             vao, count, height = create_sphere_tree()
-        x = random.uniform(-8, 8)
-        z = random.uniform(-8, 8)
+        else:
+            vao, count, height = create_palm_tree()
+        x = random.uniform(-20, 20)
+        z = random.uniform(-20, 20)
         trees.append((vao, count, height, x, z))
 
     # Główna pętla renderowania
@@ -100,6 +103,8 @@ def main():
     glfw.terminate()
 
 def process_input(window, camera, delta_time):
+    if glfw.get_key(window, glfw.KEY_ESCAPE) == glfw.PRESS:
+        glfw.set_window_should_close(window, True)
     if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:
         camera.process_keyboard("FORWARD", delta_time)
     if glfw.get_key(window, glfw.KEY_S) == glfw.PRESS:

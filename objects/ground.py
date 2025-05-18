@@ -3,9 +3,9 @@ from OpenGL.GL import *
 import ctypes
 
 def create_ground():
-    size = 10.0
+    size = 30.0
     vertices = np.array([
-        # positions           # colors (brown)
+        # positions           # color
         -size, 0.0, -size,     0.3, 0.25, 0.15,
          size, 0.0, -size,     0.3, 0.25, 0.15,
         -size, 0.0,  size,     0.3, 0.25, 0.15,
@@ -22,11 +22,11 @@ def create_ground():
     glBindBuffer(GL_ARRAY_BUFFER, VBO)
     glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
 
-    # Position attribute
+    #Position attribute
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * vertices.itemsize, ctypes.c_void_p(0))
     glEnableVertexAttribArray(0)
 
-    # Color attribute
+    #Color attribute
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * vertices.itemsize, ctypes.c_void_p(3 * vertices.itemsize))
     glEnableVertexAttribArray(1)
 
