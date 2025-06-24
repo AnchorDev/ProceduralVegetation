@@ -140,8 +140,6 @@ def mouse_callback(camera, xpos, ypos):
 
 
 def create_sun():
-    import numpy as np
-    from math import sin, cos, pi
 
     latitude_bands = 20
     longitude_bands = 20
