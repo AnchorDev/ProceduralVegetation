@@ -3,65 +3,26 @@ import ctypes
 import random
 from OpenGL.GL import *
 
-def spherical_to_cartesian(r, phi, theta):
-    x = r * np.sin(phi) * np.cos(theta)
-    y = r * np.cos(phi)
-    z = r * np.sin(phi) * np.sin(theta)
-    return [x, y, z]
+def normalize(v):
+    norm = np.linalg.norm(v)
+    return v / norm if norm > 0 else v
 
-def generate_cylinder(radius, height, segments, color):
-    verts = []
-    cols = []
-    angle_step = 2 * np.pi / segments
-    for i in range(segments):
-        θ = i * angle_step
-        θn = (i + 1) * angle_step
+def compute_normal(v0, v1, v2):
+    a = np.array(v1) - np.array(v0)
+    b = np.array(v2) - np.array(v0)
+    normal = np.cross(a, b)
+    return normalize(normal)
 
-        # dolna podstawa
-        verts += [0, 0, 0,
-                  radius * np.cos(θn), 0, radius * np.sin(θn),
-                  radius * np.cos(θ),  0, radius * np.sin(θ)]
-        cols += color * 3
-
-        # górna podstawa
-        verts += [0, height, 0,
-                  radius * np.cos(θ), height, radius * np.sin(θ),
-                  radius * np.cos(θn), height, radius * np.sin(θn)]
-        cols += color * 3
-
-        # boki (2 trójkąty)
-        verts += [
-            radius * np.cos(θ),  0,          radius * np.sin(θ),
-            radius * np.cos(θ),  height,     radius * np.sin(θ),
-            radius * np.cos(θn), height,     radius * np.sin(θn),
-
-            radius * np.cos(θ),  0,          radius * np.sin(θ),
-            radius * np.cos(θn), height,     radius * np.sin(θn),
-            radius * np.cos(θn), 0,          radius * np.sin(θn)
-        ]
-        cols += color * 6
-
-    return verts, cols
-
-def generate_cone(radius, height, segments, y_offset, color):
-    verts = []
-    cols = []
-    angle_step = 2 * np.pi / segments
-    tip = [0.0, y_offset + height, 0.0]
-    for i in range(segments):
-        θ  = i * angle_step
-        θn = (i + 1) * angle_step
-
-        b1 = [radius * np.cos(θ),  y_offset, radius * np.sin(θ)]
-        b2 = [radius * np.cos(θn), y_offset, radius * np.sin(θn)]
-
-        verts += b1 + b2 + tip
-        cols  += color * 3
-
-    return verts, cols
+def create_triangle(v0, v1, v2, color):
+    normal = compute_normal(v0, v1, v2)
+    return [
+        *v0, *normal, *color,
+        *v1, *normal, *color,
+        *v2, *normal, *color,
+    ]
 
 def create_cone_tree():
-    trunk_height = random.uniform(0.3, 0.5)  # niski pień
+    trunk_height = random.uniform(0.3, 0.5)
     trunk_radius = random.uniform(0.05, 0.12)
     crown_height = random.uniform(1.0, 1.6)
     crown_radius = random.uniform(0.5, 0.8)
@@ -75,133 +36,94 @@ def create_cone_tree():
         next_angle = 2 * np.pi * (i + 1) / segments
         x0, z0 = np.cos(angle) * trunk_radius, np.sin(angle) * trunk_radius
         x1, z1 = np.cos(next_angle) * trunk_radius, np.sin(next_angle) * trunk_radius
+        y0 = 0
+        y1 = trunk_height
+        color = [0.55, 0.27, 0.07]
 
-        # Ściany boczne
-        vertices += [x0, 0, z0, 0.55, 0.27, 0.07]
-        vertices += [x1, 0, z1, 0.55, 0.27, 0.07]
-        vertices += [x0, trunk_height, z0, 0.55, 0.27, 0.07]
+        # 2 trójkąty boków
+        vertices += create_triangle([x0, y0, z0], [x1, y0, z1], [x0, y1, z0], color)
+        vertices += create_triangle([x1, y0, z1], [x1, y1, z1], [x0, y1, z0], color)
 
-        vertices += [x1, 0, z1, 0.55, 0.27, 0.07]
-        vertices += [x1, trunk_height, z1, 0.55, 0.27, 0.07]
-        vertices += [x0, trunk_height, z0, 0.55, 0.27, 0.07]
-
-    # === DWA STOŻKI ===
+    # === STOŻKI ===
+    base_y = trunk_height
     lower_radius = crown_radius * 1.2
     lower_height = crown_height * 0.5
     upper_radius = crown_radius
     upper_height = crown_height * 0.6
-
-    base_y = trunk_height
     overlap = lower_height * 0.4
 
     # Dolny stożek
     for i in range(segments):
-        angle = 2 * np.pi * i / segments
-        next_angle = 2 * np.pi * (i + 1) / segments
-        x0, z0 = np.cos(angle) * lower_radius, np.sin(angle) * lower_radius
-        x1, z1 = np.cos(next_angle) * lower_radius, np.sin(next_angle) * lower_radius
-
-        vertices += [x0, base_y, z0, 0.1, 0.6, 0.1]
-        vertices += [x1, base_y, z1, 0.1, 0.6, 0.1]
-        vertices += [0, base_y + lower_height, 0, 0.1, 0.6, 0.1]
+        a = 2 * np.pi * i / segments
+        b = 2 * np.pi * (i + 1) / segments
+        x0, z0 = np.cos(a) * lower_radius, np.sin(a) * lower_radius
+        x1, z1 = np.cos(b) * lower_radius, np.sin(b) * lower_radius
+        y_base = base_y
+        y_tip = base_y + lower_height
+        color = [0.1, 0.6, 0.1]
+        vertices += create_triangle([x0, y_base, z0], [x1, y_base, z1], [0, y_tip, 0], color)
 
     # Górny stożek
-    upper_base_y = base_y + lower_height - overlap
+    upper_base = base_y + lower_height - overlap
     for i in range(segments):
-        angle = 2 * np.pi * i / segments
-        next_angle = 2 * np.pi * (i + 1) / segments
-        x0, z0 = np.cos(angle) * upper_radius, np.sin(angle) * upper_radius
-        x1, z1 = np.cos(next_angle) * upper_radius, np.sin(next_angle) * upper_radius
-
-        vertices += [x0, upper_base_y, z0, 0.1, 0.6, 0.1]
-        vertices += [x1, upper_base_y, z1, 0.1, 0.6, 0.1]
-        vertices += [0, upper_base_y + upper_height, 0, 0.1, 0.6, 0.1]
+        a = 2 * np.pi * i / segments
+        b = 2 * np.pi * (i + 1) / segments
+        x0, z0 = np.cos(a) * upper_radius, np.sin(a) * upper_radius
+        x1, z1 = np.cos(b) * upper_radius, np.sin(b) * upper_radius
+        y_base = upper_base
+        y_tip = upper_base + upper_height
+        color = [0.1, 0.6, 0.1]
+        vertices += create_triangle([x0, y_base, z0], [x1, y_base, z1], [0, y_tip, 0], color)
 
     vertices = np.array(vertices, dtype=np.float32)
+    return prepare_tree_vao(vertices), len(vertices) // 9, upper_base + upper_height
 
-    VAO = glGenVertexArrays(1)
-    VBO = glGenBuffers(1)
+def create_sphere_tree():
+    trunk_h = random.uniform(0.6, 1.5)
+    trunk_r = random.uniform(0.05, 0.15)
+    segments = random.randint(6, 12)
+    vertices = []
 
-    glBindVertexArray(VAO)
-    glBindBuffer(GL_ARRAY_BUFFER, VBO)
-    glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
+    # PIEŃ
+    for i in range(segments):
+        θ = 2 * np.pi * i / segments
+        θn = 2 * np.pi * (i + 1) / segments
+        x0, z0 = np.cos(θ) * trunk_r, np.sin(θ) * trunk_r
+        x1, z1 = np.cos(θn) * trunk_r, np.sin(θn) * trunk_r
+        color = [0.55, 0.27, 0.07]
+        vertices += create_triangle([x0, 0, z0], [x1, 0, z1], [x0, trunk_h, z0], color)
+        vertices += create_triangle([x1, 0, z1], [x1, trunk_h, z1], [x0, trunk_h, z0], color)
 
-    # Pozycje
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * vertices.itemsize, ctypes.c_void_p(0))
-    glEnableVertexAttribArray(0)
+    # KORONA
+    blobs = random.randint(4, 8)
+    for _ in range(blobs):
+        r_blob = random.uniform(0.2, 0.4)
+        off_x, off_y, off_z = [random.uniform(-0.2, 0.2), random.uniform(0.0, 0.4), random.uniform(-0.2, 0.2)]
+        rings, segs = 6, 8
+        for i in range(rings):
+            φ1 = np.pi * i / rings
+            φ2 = np.pi * (i + 1) / rings
+            for j in range(segs):
+                θ1 = 2 * np.pi * j / segs
+                θ2 = 2 * np.pi * (j + 1) / segs
+                p1 = spherical(r_blob, φ1, θ1)
+                p2 = spherical(r_blob, φ1, θ2)
+                p3 = spherical(r_blob, φ2, θ2)
+                p4 = spherical(r_blob, φ2, θ1)
+                color = [0.1, 0.6 + random.uniform(0, 0.4), 0.1]
+                for tri in ((p1, p2, p3), (p1, p3, p4)):
+                    tri_trans = [[v[0] + off_x, v[1] + trunk_h + off_y, v[2] + off_z] for v in tri]
+                    vertices += create_triangle(*tri_trans, color)
 
-    # Kolory
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * vertices.itemsize, ctypes.c_void_p(3 * vertices.itemsize))
-    glEnableVertexAttribArray(1)
+    vertices = np.array(vertices, dtype=np.float32)
+    return prepare_tree_vao(vertices), len(vertices) // 9, trunk_h + 0.8
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0)
-    glBindVertexArray(0)
-
-    total_height = upper_base_y + upper_height
-    return VAO, len(vertices) // 6, total_height
-
-def add_palm_leaf_feathered(vertices, top_y, angle, min_length=1.0, max_length=2.0):
-    segment_count = 12
-    length = random.uniform(min_length, max_length)
-    curve_factor = 1.5
-    max_width = 0.4
-    feather_size = 0.15
-
-    direction = np.array([np.cos(angle), 0, np.sin(angle)])
-    up = np.array([0, 1, 0])
-    side = np.cross(direction, up)
-
-    prev_left = None
-    prev_right = None
-
-    for i in range(segment_count + 1):
-        t = i / segment_count
-        segment_length = length * t
-
-        curve_y = top_y - (t ** 2) * curve_factor
-        width = max_width * (1 - t)
-
-        center = direction * segment_length
-        center = np.array([center[0], curve_y, center[2]])
-
-        left = center + side * width
-        right = center - side * width
-
-        # Ząbki
-        feather_dir = np.cross(side, direction)
-        feather_strength = feather_size * (1 - t)
-
-        feather_left = left + feather_dir * feather_strength
-        feather_right = right + feather_dir * feather_strength
-
-        color = [0.1, 0.6, 0.1]
-
-        if i > 0:
-            vertices += [
-                *prev_left, *color,
-                *left, *color,
-                *right, *color,
-
-                *prev_left, *color,
-                *right, *color,
-                *prev_right, *color
-            ]
-
-            if t < 0.9:
-                vertices += [
-                    *left, *color,
-                    *feather_left, *color,
-                    *prev_left, *color,
-
-                    *right, *color,
-                    *feather_right, *color,
-                    *prev_right, *color
-                ]
-
-        prev_left = left
-        prev_right = right
-
-
+def spherical(r, phi, theta):
+    return [
+        r * np.sin(phi) * np.cos(theta),
+        r * np.cos(phi),
+        r * np.sin(phi) * np.sin(theta)
+    ]
 
 def create_palm_tree():
     trunk_height = random.uniform(2.5, 4.0)
@@ -209,117 +131,68 @@ def create_palm_tree():
     segments = 10
     vertices = []
 
-    # === PIEŃ ===
+    # PIEŃ
     for i in range(segments):
         θ = 2 * np.pi * i / segments
         θn = 2 * np.pi * (i + 1) / segments
         x0, z0 = np.cos(θ) * trunk_radius, np.sin(θ) * trunk_radius
         x1, z1 = np.cos(θn) * trunk_radius, np.sin(θn) * trunk_radius
+        color = [0.6, 0.4, 0.2]
+        vertices += create_triangle([x0, 0, z0], [x1, 0, z1], [x0, trunk_height, z0], color)
+        vertices += create_triangle([x1, 0, z1], [x1, trunk_height, z1], [x0, trunk_height, z0], color)
 
-        # dwa trójkąty na bok
-        vertices += [
-            x0, 0, z0, 0.6, 0.4, 0.2,
-            x1, 0, z1, 0.6, 0.4, 0.2,
-            x0, trunk_height, z0, 0.6, 0.4, 0.2,
-
-            x1, 0, z1, 0.6, 0.4, 0.2,
-            x1, trunk_height, z1, 0.6, 0.4, 0.2,
-            x0, trunk_height, z0, 0.6, 0.4, 0.2,
-        ]
-
-    # === LIŚCIE ===
+    # LIŚCIE
     top = trunk_height
-
-    leaf_count = 6
-    for i in range(leaf_count):
-        angle = 2 * np.pi * i / leaf_count
-        add_palm_leaf_feathered(vertices, top, angle)
+    for i in range(6):
+        angle = 2 * np.pi * i / 6
+        add_palm_leaf(vertices, top, angle)
 
     vertices = np.array(vertices, dtype=np.float32)
+    return prepare_tree_vao(vertices), len(vertices) // 9, trunk_height + 0.5
 
-    VAO = glGenVertexArrays(1)
-    VBO = glGenBuffers(1)
+def add_palm_leaf(vertices, top_y, angle):
+    segments = 10
+    length = random.uniform(1.0, 2.0)
+    max_width = 0.3
+    color = [0.1, 0.6, 0.1]
 
-    glBindVertexArray(VAO)
-    glBindBuffer(GL_ARRAY_BUFFER, VBO)
-    glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
+    dir = np.array([np.cos(angle), 0, np.sin(angle)])
+    up = np.array([0, 1, 0])
+    side = np.cross(dir, up)
 
-    #position
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * 4, ctypes.c_void_p(0))
-    glEnableVertexAttribArray(0)
+    for i in range(segments):
+        t1 = i / segments
+        t2 = (i + 1) / segments
+        w1 = max_width * (1 - t1)
+        w2 = max_width * (1 - t2)
+        p1 = dir * (length * t1)
+        p2 = dir * (length * t2)
+        y1 = top_y - t1 * 0.5
+        y2 = top_y - t2 * 0.5
+        c1 = np.array([p1[0], y1, p1[2]])
+        c2 = np.array([p2[0], y2, p2[2]])
+        l1 = c1 + side * w1
+        l2 = c2 + side * w2
+        r1 = c1 - side * w1
+        r2 = c2 - side * w2
+        vertices += create_triangle(l1, l2, r2, color)
+        vertices += create_triangle(l1, r2, r1, color)
 
-    #color
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * 4, ctypes.c_void_p(12))
-    glEnableVertexAttribArray(1)
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0)
-    glBindVertexArray(0)
-
-    return VAO, len(vertices) // 6, trunk_height
-
-
-
-
-def create_sphere_tree():
-    trunk_h = random.uniform(0.6, 1.5)
-    trunk_r = random.uniform(0.05, 0.15)
-    segs    = random.randint(6, 12)
-
-    vertices = []
-    # PIEŃ
-    for i in range(segs):
-        θ  = 2 * np.pi * i / segs
-        θn = 2 * np.pi * (i+1) / segs
-        x0, z0 = np.cos(θ)*trunk_r, np.sin(θ)*trunk_r
-        x1, z1 = np.cos(θn)*trunk_r,np.sin(θn)*trunk_r
-        # dwa trójkąty
-        vertices += [x0,0,z0, 0.55,0.27,0.07,
-                     x1,0,z1, 0.55,0.27,0.07,
-                     x0,trunk_h,z0, 0.55,0.27,0.07]
-        vertices += [x1,0,z1, 0.55,0.27,0.07,
-                     x1,trunk_h,z1, 0.55,0.27,0.07,
-                     x0,trunk_h,z0, 0.55,0.27,0.07]
-
-    # KORONA"
-    blobs = random.randint(4, 8)
-    for _ in range(blobs):
-        r_blob = random.uniform(0.2, 0.4)
-        off_x = random.uniform(-0.2, 0.2)
-        off_y = random.uniform(0.0, 0.4)
-        off_z = random.uniform(-0.2, 0.2)
-        rings = 6
-        segs_s = 8
-        for i in range(rings):
-            φ1 = np.pi * i / rings
-            φ2 = np.pi * (i+1) / rings
-            for j in range(segs_s):
-                θ1 = 2*np.pi * j / segs_s
-                θ2 = 2*np.pi * (j+1) / segs_s
-                p1 = spherical_to_cartesian(r_blob, φ1, θ1)
-                p2 = spherical_to_cartesian(r_blob, φ1, θ2)
-                p3 = spherical_to_cartesian(r_blob, φ2, θ2)
-                p4 = spherical_to_cartesian(r_blob, φ2, θ1)
-                for tri in ((p1,p2,p3),(p1,p3,p4)):
-                    for px in tri:
-                        x, y, z = px[0]+off_x, px[1]+trunk_h+off_y, px[2]+off_z
-                        vertices += [x, y, z, 0.1, 0.6 + random.uniform(0.0,0.4), 0.1]
-
-    vertices = np.array(vertices, dtype=np.float32)
-
+def prepare_tree_vao(vertices):
     VAO = glGenVertexArrays(1)
     VBO = glGenBuffers(1)
     glBindVertexArray(VAO)
     glBindBuffer(GL_ARRAY_BUFFER, VBO)
     glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * 4, ctypes.c_void_p(0))
+    stride = 9 * 4
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
     glEnableVertexAttribArray(0)
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * 4, ctypes.c_void_p(3 * 4))
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(3 * 4))
     glEnableVertexAttribArray(1)
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(6 * 4))
+    glEnableVertexAttribArray(2)
 
     glBindBuffer(GL_ARRAY_BUFFER, 0)
     glBindVertexArray(0)
-    return VAO, len(vertices) // 6, trunk_h
-
-def create_tree():
-    return create_cone_tree()
+    return VAO

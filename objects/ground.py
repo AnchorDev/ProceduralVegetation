@@ -4,16 +4,24 @@ import ctypes
 
 def create_ground():
     size = 30.0
-    vertices = np.array([
-        # positions           # color
-        -size, 0.0, -size,     0.3, 0.25, 0.15,
-         size, 0.0, -size,     0.3, 0.25, 0.15,
-        -size, 0.0,  size,     0.3, 0.25, 0.15,
+    normal = [0.0, 1.0, 0.0]
+    color = [0.3, 0.25, 0.15]
 
-        -size, 0.0,  size,     0.3, 0.25, 0.15,
-         size, 0.0, -size,     0.3, 0.25, 0.15,
-         size, 0.0,  size,     0.3, 0.25, 0.15,
-    ], dtype=np.float32)
+    vertices = []
+
+    positions = [
+        [-size, 0.0, -size],
+        [ size, 0.0, -size],
+        [-size, 0.0,  size],
+        [-size, 0.0,  size],
+        [ size, 0.0, -size],
+        [ size, 0.0,  size],
+    ]
+
+    for pos in positions:
+        vertices += pos + normal + color
+
+    vertices = np.array(vertices, dtype=np.float32)
 
     VAO = glGenVertexArrays(1)
     VBO = glGenBuffers(1)
@@ -22,15 +30,21 @@ def create_ground():
     glBindBuffer(GL_ARRAY_BUFFER, VBO)
     glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
 
-    #Position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * vertices.itemsize, ctypes.c_void_p(0))
+    stride = 9 * vertices.itemsize  # 3 pos + 3 norm + 3 col
+
+    # Pozycje
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
     glEnableVertexAttribArray(0)
 
-    #Color attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * vertices.itemsize, ctypes.c_void_p(3 * vertices.itemsize))
+    # Normalne
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(3 * vertices.itemsize))
     glEnableVertexAttribArray(1)
+
+    # Kolor
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(6 * vertices.itemsize))
+    glEnableVertexAttribArray(2)
 
     glBindBuffer(GL_ARRAY_BUFFER, 0)
     glBindVertexArray(0)
 
-    return VAO, 6  # 6 vertices (2 triangles)
+    return VAO, 6
