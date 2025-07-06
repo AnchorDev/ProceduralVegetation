@@ -12,6 +12,8 @@ from utils.camera import Camera
 from objects.tree import create_cone_tree, create_sphere_tree, create_palm_tree
 from objects.ground import create_ground
 
+NUM_TREES = 1000
+
 # Myszka
 last_x, last_y = 400, 300
 first_mouse = True
@@ -27,6 +29,9 @@ def main():
         glfw.terminate()
         return
     glfw.make_context_current(window)
+
+    benchmark_tree_generation()
+
     glfw.set_input_mode(window, glfw.CURSOR, glfw.CURSOR_DISABLED)
 
     # Kamera
@@ -60,7 +65,7 @@ def main():
 
     # Drzewa
     trees = []
-    for _ in range(500):
+    for _ in range(NUM_TREES):
         r = random.random()
         if r < 0.33:
             vao, count, height = create_cone_tree()
@@ -209,6 +214,42 @@ def create_sun():
 
     return vao, len(vertices) // 9
 
+
+def benchmark_tree_generation():
+    import matplotlib.pyplot as plt
+
+    tree_counts = [100, 250, 500, 750, 1000, 1500, 2000]
+    generation_times = []
+
+    for count in tree_counts:
+        start = time.time()
+
+        trees = []
+        for _ in range(count):
+            r = random.random()
+            if r < 0.33:
+                vao, c, h = create_cone_tree()
+            elif r < 0.66:
+                vao, c, h = create_sphere_tree()
+            else:
+                vao, c, h = create_palm_tree()
+            x = random.uniform(-20, 20)
+            z = random.uniform(-20, 20)
+            trees.append((vao, c, h, x, z))
+
+        end = time.time()
+        gen_time = end - start
+        generation_times.append(gen_time)
+        print(f"{count} drzew: {gen_time:.4f} sekundy")
+
+    # Wykres
+    plt.figure(figsize=(8, 5))
+    plt.plot(tree_counts, generation_times, marker='o')
+    plt.xlabel("Liczba drzew")
+    plt.ylabel("Czas generowania [s]")
+    plt.title("Czas generowania drzew vs liczba drzew")
+    plt.grid(True)
+    plt.show()
 
 
 if __name__ == "__main__":
